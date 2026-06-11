@@ -106,8 +106,8 @@ def run_post_generation_agent(
         }
 
     # Model choice with robust fallback
-    model_name = "gemini-2.5-flash"
-    fallback_model_name = "gemini-2.0-flash"
+    model_name = "gemini-2.0-flash"
+    fallback_model_name = "gemini-2.5-flash"
     
     # Step 1: PLANNING
     step1_start = time.time()
