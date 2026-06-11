@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkCraft AI — Premium LinkedIn Post Generator</title>
+    <!-- Premium Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="glow-bg"></div>
+    <div class="glow-bg-secondary"></div>
+
+    <header class="app-header">
+        <div class="logo">
+            <span class="logo-icon"><i class="fa-brands fa-linkedin-in"></i></span>
+            <h1>LinkCraft <span class="accent-text">AI</span></h1>
+        </div>
+        <div class="badge">
+            <span class="status-dot"></span> Agentic Mode Active
+        </div>
+    </header>
+
+    <main class="app-container">
+        <!-- Settings Panel -->
+        <section class="panel-section input-panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-sliders"></i> Generator Settings</h2>
+                <p>Configure your content strategy and let the AI Agent design your posts.</p>
+            </div>
+            
+            <form id="generator-form">
+                <div class="form-group">
+                    <label for="topic">Topic / Core Message <span class="required">*</span></label>
+                    <textarea id="topic" name="topic" rows="3" placeholder="e.g. Cold-start strategies for double-sided marketplaces or how we scaled our API to 10k RPS" required></textarea>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="tone">Tone / Persona</label>
+                        <select id="tone" name="tone">
+                            <option value="Thought Leader" selected>💡 Thought Leader (Authoritative & Insightful)</option>
+                            <option value="Storyteller">📖 Storyteller (Engaging & Anecdotal)</option>
+                            <option value="Contrarian">🔥 Contrarian (Bold & Debate-Triggering)</option>
+                            <option value="Relatable Builder">🛠️ Relatable Builder (Humorous, Building in Public)</option>
+                            <option value="Educator">🏫 Educator (Highly Structured, Framework-focused)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="audience">Target Audience</label>
+                        <input type="text" id="audience" name="audience" placeholder="e.g. Founders, Engineers, Recruiters" value="Software Engineers & Tech Leaders">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="length">Post Length</label>
+                        <select id="length" name="length">
+                            <option value="short">Short (&lt; 100 words)</option>
+                            <option value="medium" selected>Medium (100 - 250 words)</option>
+                            <option value="long">Long (250 - 400 words)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="count">Post Options</label>
+                        <select id="count" name="count">
+                            <option value="3" selected>3 Post Drafts</option>
+                            <option value="4">4 Post Drafts</option>
+                            <option value="5">5 Post Drafts</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="cta">Call to Action (CTA) <span class="optional">(Optional)</span></label>
+                    <input type="text" id="cta" name="cta" placeholder="e.g. Ask them to share opinions in comments, or subscribe to newsletter link">
+                </div>
+
+                <div class="form-group">
+                    <label for="examples">Style Reference / Mimic Example <span class="optional">(Optional)</span></label>
+                    <textarea id="examples" name="examples" rows="2" placeholder="Paste a post you love here; the agent will mimic its sentence flow and structure."></textarea>
+                </div>
+
+                <button type="submit" class="btn-primary" id="generate-btn">
+                    <span>Generate LinkedIn Posts</span>
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </button>
+            </form>
+        </section>
+
+        <!-- Output Display Panel -->
+        <section class="panel-section output-panel">
+            <!-- Blank State -->
+            <div class="blank-state" id="blank-state">
+                <div class="illustration">
+                    <i class="fa-solid fa-message-dots"></i>
+                </div>
+                <h3>Your workspace is ready</h3>
+                <p>Fill out the settings and trigger the AI Agent to design your post drafts. Your outputs will display here.</p>
+            </div>
+
+            <!-- Loading State -->
+            <div class="loading-state hidden" id="loading-state">
+                <div class="spinner-container">
+                    <div class="spinner"></div>
+                </div>
+                <h3>Agent Core Working...</h3>
+                
+                <!-- Stepper Progress Tracker -->
+                <div class="stepper">
+                    <div class="step active" id="step-1">
+                        <span class="step-num">1</span>
+                        <span class="step-label">Planning Concepts</span>
+                    </div>
+                    <div class="step" id="step-2">
+                        <span class="step-num">2</span>
+                        <span class="step-label">Drafting Options</span>
+                    </div>
+                    <div class="step" id="step-3">
+                        <span class="step-num">3</span>
+                        <span class="step-label">Quality Guardrails</span>
+                    </div>
+                </div>
+                <p class="loading-hint" id="loading-hint">Initializing the Gemini AI engine...</p>
+            </div>
+
+            <!-- Content State -->
+            <div class="content-state hidden" id="content-state">
+                <div class="results-header">
+                    <h2>Generated Drafts</h2>
+                    <!-- Performance Metrics Bar -->
+                    <div class="stats-bar">
+                        <div class="stat-badge">
+                            <span class="stat-lbl">Latency</span>
+                            <span class="stat-val" id="stat-latency">--s</span>
+                        </div>
+                        <div class="stat-badge">
+                            <span class="stat-lbl">Cost Estimate</span>
+                            <span class="stat-val" id="stat-cost">$0.00</span>
+                        </div>
+                        <div class="stat-badge">
+                            <span class="stat-lbl">Model</span>
+                            <span class="stat-val" id="stat-model">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="posts-list" id="posts-container">
+                    <!-- Cards will be generated dynamically -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        <p>&copy; 2026 LinkCraft AI. Deployed securely on Vercel. Powered by Google Gemini 2.5.</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
