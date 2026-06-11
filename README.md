@@ -1,78 +1,68 @@
-# LinkCraft AI — Premium LinkedIn Post Generator
+# LinkCraft AI — Agentic LinkedIn Post Generator
 
-A high-fidelity, premium AI-powered LinkedIn Post Generator built with a FastAPI backend and a custom dark-themed Glassmorphic Vanilla HTML/CSS/JS frontend. Designed specifically for serverless deployment on **Vercel**.
+LinkCraft AI is a high-fidelity, production-ready web application designed to help creators, founders, and professionals translate core concepts into highly engaging, structured, and customized LinkedIn post variations. 
 
-## Project Structure
-```
-├── api/
-│   ├── agent.py          # AI agent flow (Outline -> Draft -> Refine/Scrub)
-│   ├── index.py          # FastAPI application serverless entry point
-│   └── requirements.txt  # Python requirements
-├── public/
-│   ├── index.html        # Clean semantic interface layout
-│   ├── style.css         # Modern glassmorphism system & keyframe animations
-│   └── app.js            # Fetch calls, copying functionality & active loading sequences
-├── vercel.json           # Routes mapping configuration for Vercel functions
-└── README.md             # This file
-```
+Unlike single-prompt generators, LinkCraft AI utilizes a multi-stage **agentic pipeline** to plan, draft, and self-correct content, ensuring high readability and platform-native engagement.
 
 ---
 
-## 🔒 Security Best Practices (Handling API Keys Safely)
+## 🚀 Product Features & UX Design
 
-To prevent security breaches and unauthorized API usage:
-
-1. **Never Hardcode Secrets**: 
-   Avoid placing the raw API key anywhere in the git history or source code files (`agent.py`, `index.py`, etc.).
-2. **Environment Variables**:
-   The application references `os.environ.get("GEMINI_API_KEY")`. Always store your credentials in environment variables.
-3. **Set Up on Vercel Dashboard**:
-   When deploying the project to Vercel:
-   - Navigate to your Vercel Project Dashboard.
-   - Go to **Settings** > **Environment Variables**.
-   - Add a new variable named `GEMINI_API_KEY` and paste your Gemini API key as the value.
-   - Save and redeploy. Vercel injects this securely on the server-side, keeping it completely hidden from client-side browsers.
-4. **Local Development Config**:
-   For local testing, run the app using commands that inject the key in memory temporarily rather than checking in a configuration file:
-   - **PowerShell (Windows)**:
-     ```powershell
-     $env:GEMINI_API_KEY="your_api_key_here"
-     python -m uvicorn api.index:app --reload
-     ```
-   - **Command Prompt (Windows)**:
-     ```cmd
-     set GEMINI_API_KEY=your_api_key_here
-     python -m uvicorn api.index:app --reload
-     ```
-   - **Bash/Terminal (Linux/macOS)**:
-     ```bash
-     export GEMINI_API_KEY="your_api_key_here"
-     python -m uvicorn api.index:app --reload
-     ```
-5. **GitIgnore Settings**:
-   Always make sure standard files containing local environment definitions (like `.env` or local profiles) are included in `.gitignore` so they are never pushed to GitHub.
+- **Goal-Oriented Post Planning**: Generates $\ge$ 3 distinct, highly differentiated content angles (e.g., Storytelling/Anecdotal, Educational Listicle, Bold/Contrarian) rather than simple text repetitions.
+- **Customizable Audience & Persona Settings**: Dynamically adapts formatting rules, slang, complexity, and sentence structure based on user-defined personas (e.g., Thought Leader, Relatable Builder) and target reader demographics.
+- **Style Mimic Engine**: Allows creators to paste writing examples to emulate sentence structures, spacing, and personal tone.
+- **Visual Progress Tracker**: A simulated multi-step loader shows the active state of the agentic pipeline in real time (Planning $\rightarrow$ Drafting $\rightarrow$ Guardrails), enhancing user trust.
+- **LinkedIn-Optimized Layouts**: Output cards feature clear spacing, high-traffic hashtag suggestion groups, call-to-actions (CTAs), and a quick copy-to-clipboard function.
 
 ---
 
-## 🛠️ Local Development Setup
+## 🛠️ Architecture & System Design
 
-To run and test the project locally, ensure you have **Python 3.12** installed:
+```mermaid
+graph TD
+    A[Frontend: HTML/CSS/JS] -->|POST /api/generate| B[FastAPI Backend Router]
+    B --> C[Agentic Pipeline Orchestrator]
+    C -->|Step 1: Planning| D[Outline distinct post hooks]
+    D -->|Step 2: Drafting| E[Write full post copy]
+    E -->|Step 3: Guardrail Check| F[Scrub AI clichés & verify safety]
+    F -->|Output Final JSON| B
+    B -->|Response| A
+```
 
-1. **Install Dependencies**:
-   Open a terminal and navigate to the project directory:
-   ```bash
-   pip install -r api/requirements.txt
-   ```
+### 1. The Multi-Stage Agentic Pipeline
+The generation process is split into three distinct sequential steps:
+1. **Planning Step**: The agent analyzes the topic and defines structural concepts (hooks, core takeaways) for each post variant.
+2. **Drafting Step**: Takes the approved outlines and expands them into complete copy, adhering to strict length guidelines and targeted tone guidelines.
+3. **Guardrails & Refinement**: A final self-correction agent reviews the draft to remove typical corporate AI buzzwords (e.g., *“delve,” “tapestry,” “in today's fast-paced world”*), format paragraph line-breaks, verify safety standards, and suggest highly relevant hashtags.
 
-2. **Configure Your API Key**:
-   In your terminal, set the `GEMINI_API_KEY` env variable (refer to instructions above).
+### 2. Self-Healing Failover
+To guarantee high availability under heavy API usage, the backend incorporates a **self-healing fallback handler**. If the primary model (`gemini-2.5-flash`) returns a `503 Service Unavailable` error, the backend transparently switches the request pipeline to `gemini-2.0-flash` without interrupting the user experience.
 
-3. **Start the Local Development Server**:
-   ```bash
-   python -m uvicorn api.index:app --reload
-   ```
+---
 
-4. **Access the App**:
-   Open your browser and navigate to:
-   - Frontend: `http://localhost:8000/index.html`
-   - Health Check: `http://localhost:8000/api/health`
+## 💻 Tech Stack & Deployment
+
+- **Frontend**: Vanilla HTML5, CSS3 (featuring dark glassmorphic styling, custom keyframe transitions, and responsive grid layouts), and Vanilla JavaScript.
+- **Backend**: Python 3.12, FastAPI (high-performance, asynchronous web router), and the Google Gen AI SDK.
+- **Hosting**: Deployed as serverless functions on **Vercel** via API route mapping.
+
+---
+
+## ⚙️ Development & Local Execution
+
+### 1. Prerequisites
+- Python 3.12+ installed.
+- A Gemini API Key from Google AI Studio.
+
+### 2. Installation
+Clone the repository and install the dependencies:
+```bash
+pip install -r api/requirements.txt
+```
+
+### 3. Local Startup
+Start the development server using:
+```bash
+python -m uvicorn api.index:app --reload
+```
+Open your browser and navigate to `http://localhost:8000` to interact with the application.
