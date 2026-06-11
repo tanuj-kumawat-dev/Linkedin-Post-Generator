@@ -30,20 +30,20 @@ graph TD
 ```
 
 ### 1. The Multi-Stage Agentic Pipeline
-The generation process is split into three distinct sequential steps:
+The generation process is executed in an optimized single-pass structure to minimize API latency and request count:
 1. **Planning Step**: The agent analyzes the topic and defines structural concepts (hooks, core takeaways) for each post variant.
-2. **Drafting Step**: Takes the approved outlines and expands them into complete copy, adhering to strict length guidelines and targeted tone guidelines.
-3. **Guardrails & Refinement**: A final self-correction agent reviews the draft to remove typical corporate AI buzzwords (e.g., *“delve,” “tapestry,” “in today's fast-paced world”*), format paragraph line-breaks, verify safety standards, and suggest highly relevant hashtags.
+2. **Drafting Step**: Expands concepts into complete copy, adhering to strict length guidelines and targeted tone guidelines.
+3. **Guardrails & Refinement**: A final self-correction stage reviews the draft to remove typical corporate AI buzzwords (e.g., *“delve,” “tapestry,” “in today's fast-paced world”*), format paragraph line-breaks, verify safety standards, and suggest highly relevant hashtags.
 
-### 2. Self-Healing Failover
-To guarantee high availability under heavy API usage, the backend incorporates a **self-healing fallback handler**. If the primary model (`gemini-2.5-flash`) returns a `503 Service Unavailable` error, the backend transparently switches the request pipeline to `gemini-2.0-flash` without interrupting the user experience.
+### 2. High-Capacity Model Backend
+The application is powered by the **Groq API** running **Llama 3.3 70B** (`llama-3.3-70b-versatile`) in structured JSON mode. This ensures extremely fast generation times (typically under 2 seconds) and resolves the tight rate-limit ceilings common with other free-tier AI APIs.
 
 ---
 
 ## 💻 Tech Stack & Deployment
 
 - **Frontend**: Vanilla HTML5, CSS3 (featuring dark glassmorphic styling, custom keyframe transitions, and responsive grid layouts), and Vanilla JavaScript.
-- **Backend**: Python 3.12, FastAPI (high-performance, asynchronous web router), and the Google Gen AI SDK.
+- **Backend**: Python 3.12, FastAPI (high-performance, asynchronous web router), and the Groq Python SDK.
 - **Hosting**: Deployed as serverless functions on **Vercel** via API route mapping.
 
 ---
@@ -52,7 +52,7 @@ To guarantee high availability under heavy API usage, the backend incorporates a
 
 ### 1. Prerequisites
 - Python 3.12+ installed.
-- A Gemini API Key from Google AI Studio.
+- A Groq API Key from Groq Console.
 
 ### 2. Installation
 Clone the repository and install the dependencies:
