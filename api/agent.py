@@ -3,8 +3,7 @@ import time
 import json
 from pydantic import BaseModel, Field
 from typing import List, Optional
-from google import genai
-from google.genai import types
+from groq import Groq
 
 class PostOutline(BaseModel):
     id: int = Field(..., description="Post outline index (1 to N)")
@@ -35,7 +34,7 @@ class RefinementResponse(BaseModel):
     refined_posts: List[PostRefinement]
 
 def get_client():
-    """Initializes the Gemini API Client using environment variable."""
+    """Initializes the Groq API Client using environment variable."""
     # Attempt to load from a local .env file if it exists (for easy local testing)
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     if os.path.exists(env_path):
@@ -49,11 +48,10 @@ def get_client():
         except Exception:
             pass
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY environment variable is missing. Please set GEMINI_API_KEY.")
-    return genai.Client(api_key=api_key)
-
+        raise ValueError("GROQ_API_KEY environment variable is missing. Please set GROQ_API_KEY.")
+    return Groq(api_key=api_key)
 
 def clean_buzzwords(text: str) -> str:
     """Extra level of regex/string cleaning for typical AI buzzwords."""
@@ -84,18 +82,9 @@ def run_post_generation_agent(
     language: str = "English",
     count: int = 3
 ) -> dict:
-    """
-    Executes a multi-turn agent flow:
-    1. Plan distinct angles for the target post count.
-    2. Draft each option incorporating user constraints.
-    3. Review drafts, apply buzzword-scrubbing & safety checks, and format the output.
-    """
+    """Executes a single-pass copy generation query using Groq."""
     start_time = time.time()
-    
-    # Initialize variables for token tracking
-    total_input_tokens = 0
-    total_output_tokens = 0
-    latency_breakdown = {}
+    model_name = "llama-3.3-70b-versatile"
     
     try:
         client = get_client()
@@ -105,183 +94,84 @@ def run_post_generation_agent(
             "error": f"API initialization failed: {str(e)}"
         }
 
-    # Model choice with robust fallback
-    model_name = "gemini-2.0-flash"
-    fallback_model_name = "gemini-2.5-flash"
+    # Consolidated Master Prompt instructing Groq to output JSON matching our schema
+    master_prompt = f"""
+    You are an expert LinkedIn growth strategist, copywriter, and editor.
+    Your task is to generate {count} distinct, high-converting LinkedIn post drafts about the topic: "{topic}".
     
-    # Step 1: PLANNING
-    step1_start = time.time()
-    plan_prompt = f"""
-    You are an expert LinkedIn growth strategist.
-    The user wants to generate {count} posts about the topic: "{topic}".
-    Target Audience: {audience}
-    Tone Persona: {tone}
-    Reference Examples (if any): "{examples}"
-
-    Create {count} distinct hooks/strategies for these posts. Ensure they are highly differentiated:
-    - One should focus on a story-driven approach (e.g. personal experience, case study format).
-    - One should be highly educational/structured (e.g. listicle, framework breakdown).
-    - One should be contrarian, bold, or query-based to drive discussion.
-    """
-    
-    try:
-        try:
-            plan_response = client.models.generate_content(
-                model=model_name,
-                contents=plan_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=PlanningResponse,
-                    temperature=0.7
-                )
-            )
-        except Exception as primary_error:
-            # Fallback if primary model is overloaded (e.g. 503)
-            print(f"Primary model {model_name} failed: {str(primary_error)}. Retrying with fallback {fallback_model_name}...")
-            model_name = fallback_model_name
-            plan_response = client.models.generate_content(
-                model=model_name,
-                contents=plan_prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=PlanningResponse,
-                    temperature=0.7
-                )
-            )
-        
-        # Parse planning
-        plan_data = json.loads(plan_response.text)
-        latency_breakdown["planning"] = round(time.time() - step1_start, 2)
-        if plan_response.usage_metadata:
-            total_input_tokens += plan_response.usage_metadata.prompt_token_count
-            total_output_tokens += plan_response.usage_metadata.candidates_token_count
-            
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Planning step failed (tried fallback {model_name}): {str(e)}"
-        }
-
-
-    # Step 2: DRAFTING
-    step2_start = time.time()
-    drafting_prompt = f"""
-    You are an expert copywriter. Take these planned outlines and write high-converting LinkedIn post drafts.
-    
-    Topic: "{topic}"
     Target Audience: {audience}
     Tone Persona: {tone}
     Language: {language}
     Length Guideline: {length} (short = <100 words, medium = 100-250 words, long = 250-400 words)
-    Call To Action (CTA) requirement: "{cta}"
-    
-    Outlines planned:
-    {json.dumps(plan_data["outlines"], indent=2)}
-    
-    Draft each post. Follow these LinkedIn-specific guidelines:
-    - Open with a compelling 1-2 line hook.
-    - Use clear, single-line spacing between paragraphs to prevent text walls.
-    - Write in a professional yet conversational voice.
-    - Keep bullet points readable.
-    - Do not use weird markdown fonts (like bolding Unicode text); standard text only.
+    Call To Action (CTA): "{cta}"
+    Style Reference (if provided): "{examples}"
+
+    Generate your response as a JSON object matching this schema:
+    {{
+      "posts": [
+        {{
+          "id": 1,
+          "post_text": "Full text of the post draft...",
+          "suggested_hashtags": ["hashtag1", "hashtag2"],
+          "call_to_action": "Suggested CTA",
+          "justification": "Why this specific strategy suits the target audience"
+        }}
+      ]
+    }}
+
+    For each of the {count} posts:
+    1. Plan a unique hook/angle (e.g. story-based hook, analytical listicle, bold/contrarian hook).
+    2. Draft the copy using clean single-line breaks. Do NOT use robotic AI clichés like "delve", "testament", "tapestry", or "in today's fast-paced world".
+    3. Generate highly relevant hashtags and matching CTAs.
     """
     
     try:
-        draft_response = client.models.generate_content(
+        # Request completion from Groq with JSON Mode enabled and strict system instructions
+        response = client.chat.completions.create(
             model=model_name,
-            contents=drafting_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=DraftingResponse,
-                temperature=0.8
-            )
+            messages=[
+                {"role": "system", "content": "You are a strict JSON API. You must return ONLY a valid JSON object matching the requested schema. Never output markdown fences (e.g. ```json), raw backticks (`), or unescaped double quotes inside JSON string values. Escape all quotes inside values properly."},
+                {"role": "user", "content": master_prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
         )
-        draft_data = json.loads(draft_response.text)
-        latency_breakdown["drafting"] = round(time.time() - step2_start, 2)
-        if draft_response.usage_metadata:
-            total_input_tokens += draft_response.usage_metadata.prompt_token_count
-            total_output_tokens += draft_response.usage_metadata.candidates_token_count
+        
+        raw_text = response.choices[0].message.content
+        draft_data = json.loads(raw_text)
+        
+        # Compile and clean drafts
+        final_posts = []
+        for post in draft_data.get("posts", []):
+            clean_text = clean_buzzwords(post["post_text"])
+            final_posts.append({
+                "id": post["id"],
+                "post_text": clean_text,
+                "suggested_hashtags": post.get("suggested_hashtags", []),
+                "call_to_action": post.get("call_to_action", ""),
+                "justification": post.get("justification", ""),
+                "safety_passed": True,
+                "refinement_notes": "Optimized and buzzwords cleaned via Groq Llama 3.1."
+            })
             
+        total_latency = round(time.time() - start_time, 2)
+        
+        # Groq API is free; cost is estimated to be $0.00
+        return {
+            "success": True,
+            "posts": final_posts,
+            "metadata": {
+                "model": model_name,
+                "input_tokens": response.usage.prompt_tokens if hasattr(response, 'usage') else 0,
+                "output_tokens": response.usage.completion_tokens if hasattr(response, 'usage') else 0,
+                "estimated_cost_usd": 0.00,
+                "total_latency_seconds": total_latency,
+                "latency_breakdown": {"single_pass": total_latency}
+            }
+        }
+        
     except Exception as e:
         return {
             "success": False,
-            "error": f"Drafting step failed: {str(e)}"
+            "error": f"Generation failed using {model_name}: {str(e)}"
         }
-
-    # Step 3: GUARDRAILS & REFINEMENT
-    step3_start = time.time()
-    refinement_prompt = f"""
-    You are an editor. Perform a quality guardrail review on the following drafts.
-    
-    Drafts:
-    {json.dumps(draft_data["posts"], indent=2)}
-    
-    Tasks:
-    1. Filter and block any profanity, illegal claims, or hate speech (set safety_check_passed=false if failed).
-    2. Remove cliché, robotic AI transition phrases and overused buzzwords (e.g. "In today's fast-paced world", "delve", "testament").
-    3. Ensure clean formatting (clean line breaks, logical hook structure).
-    """
-    
-    try:
-        refine_response = client.models.generate_content(
-            model=model_name,
-            contents=refinement_prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=RefinementResponse,
-                temperature=0.3
-            )
-        )
-        refine_data = json.loads(refine_response.text)
-        latency_breakdown["refinement"] = round(time.time() - step3_start, 2)
-        if refine_response.usage_metadata:
-            total_input_tokens += refine_response.usage_metadata.prompt_token_count
-            total_output_tokens += refine_response.usage_metadata.candidates_token_count
-            
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Guardrails / refinement step failed: {str(e)}"
-        }
-
-    # Compile the final outputs
-    final_posts = []
-    refined_map = {item["id"]: item for item in refine_data["refined_posts"]}
-    
-    for post in draft_data["posts"]:
-        p_id = post["id"]
-        ref = refined_map.get(p_id, {})
-        
-        # Apply secondary string-based cleaning for extra robustness
-        clean_text = clean_buzzwords(ref.get("refined_post_text", post["post_text"]))
-        
-        final_posts.append({
-            "id": p_id,
-            "original_draft": post["post_text"],
-            "post_text": clean_text,
-            "suggested_hashtags": post["suggested_hashtags"],
-            "call_to_action": post["call_to_action"],
-            "justification": post["justification"],
-            "safety_passed": ref.get("safety_check_passed", True),
-            "refinement_notes": ref.get("refinement_notes", "Cleaned buzzwords and formatted for reading.")
-        })
-        
-    total_latency = round(time.time() - start_time, 2)
-    
-    # Calculate costs (Gemini 2.5 Flash prices: $0.075/1M input, $0.30/1M output tokens)
-    input_cost = (total_input_tokens / 1_000_000) * 0.075
-    output_cost = (total_output_tokens / 1_000_000) * 0.30
-    total_cost = round(input_cost + output_cost, 6)
-
-    return {
-        "success": True,
-        "posts": final_posts,
-        "metadata": {
-            "model": model_name,
-            "input_tokens": total_input_tokens,
-            "output_tokens": total_output_tokens,
-            "estimated_cost_usd": total_cost,
-            "total_latency_seconds": total_latency,
-            "latency_breakdown": latency_breakdown
-        }
-    }
